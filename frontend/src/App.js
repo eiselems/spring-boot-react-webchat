@@ -31,16 +31,8 @@ class Clock extends React.Component {
 
     render() {
         return (
-            <div>
-                <h1>
-                    It is like {this.state.date.toLocaleTimeString()}.
-                </h1>
-                <div className="ChatHistory">
-                    <p>Abcdef: This is a line of text</p>
-                    <p>Abcdef: This is another line of text</p>
-                    <p>Cdef: This is another line of text which is very very very very long and the guy likes to talk a
-                        lot</p>
-                </div>
+            <div className="Clock">
+                {this.state.date.toLocaleTimeString()}
             </div>
         )
     };
@@ -61,27 +53,20 @@ class ConnectButton extends React.Component {
     render() {
         const isConnected = this.props.connectState;
         return (
-            <button onClick={this.handleChange}>
+            <button className="Button" onClick={this.handleChange}>
                 {isConnected ? 'Disconnect' : 'Connect'}
             </button>);
     }
 }
 
-class UserList extends React.Component {
-    constructor(props) {
-        super(props)
-    }
-
-    render() {
-        const userList = this.props.users;
-        return (
-            <div className="Userlist">
-                {userList.map(function (user) {
-                    return React.createElement("p", {key: "user" + user}, user);
-                })}
-            </div>
-        );
-    }
+function UserList(props) {
+    return (
+        <div className="Userlist">
+            {props.users.map(function (user) {
+                return <p key={ID()}>{user}</p>;
+            })}
+        </div>
+    );
 }
 
 function MessageWindow(props) {
@@ -89,7 +74,7 @@ function MessageWindow(props) {
     return (
         <div className={"MessageWindow"}>
             {props.messages.map(function (msg) {
-                return React.createElement("p", {key: "msg" + msg.id}, msg.user + ": " + msg.text);
+                return <p key={ID()}>{msg.user}: {msg.text}</p>;
             })}
         </div>
     );
@@ -119,10 +104,11 @@ class UserNameField extends React.Component {
         return (
             <form onSubmit={this.handleSubmit}>
                 <label>Username:
-                    <input type="text" value={this.state.value} onChange={this.handleUserNameChange}
-                           disabled={isDisabled}/>
+
                 </label>
-                <input type="submit" value="Set"/>
+                <input type="text" value={this.state.value} onChange={this.handleUserNameChange}
+                       disabled={isDisabled}/>
+                <input type="submit" value="Set Name" hidden={isDisabled}/>
             </form>
         );
     }
@@ -140,11 +126,12 @@ class MessageLine extends React.Component {
     onSubmit(event) {
         event.preventDefault();
         let message = {
-                id: ID(),
-                user: this.props.userName,
-                text: this.state.text
-            };
+            id: ID(),
+            user: this.props.userName,
+            text: this.state.text
+        };
         this.props.appendNewMessage(message)
+        this.setState({text: ""})
     }
 
     handleTextChange(event) {
@@ -152,12 +139,11 @@ class MessageLine extends React.Component {
     }
 
     render() {
+        const isDisabled = !this.props.connectState;
         return (
             <form onSubmit={this.onSubmit}>
-                <label>Text:
-                    <input type="text" value={this.state.value} onChange={this.handleTextChange}/>
-                </label>
-                <input type="submit" value="Set"/>
+                <textarea className="TextLine" value={this.state.text} onChange={this.handleTextChange} disabled={isDisabled}/>
+                <input className="Button" type="submit" value="Send" disabled={isDisabled}/>
             </form>
         );
 
@@ -230,17 +216,21 @@ class App extends React.Component {
         return (
             <div className="App">
                 <header className="App-header">
-                    <h1 className="App-title">Welcome to React</h1>
-                </header>
-                <div className="App-intro">
+                    <h1 className="App-title">Mo Chat</h1>
                     <Clock/>
+                </header>
+                <div className="Settings">
                     <UserNameField userName={userName} onUserNameChange={this.changeUserName}
                                    connectState={connectState}/>
-                    <Welcome name={userName}/>
                     <ConnectButton connectState={connectState} onConnectStateChange={this.changeConnectState}/>
-                    <UserList users={users}/>
+                </div>
+                <div className="Center">
                     <MessageWindow messages={messages}/>
-                    <MessageLine appendNewMessage={this.appendNewMessage} userName={userName}/>
+                    <UserList users={users}/>
+                </div>
+                <div className="Footer">
+                    <MessageLine appendNewMessage={this.appendNewMessage} userName={userName}
+                                 connectState={connectState}/>
                 </div>
             </div>
         );
