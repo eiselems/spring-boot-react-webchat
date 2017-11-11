@@ -1,12 +1,13 @@
 package com.marcuseisele.webchat.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.ToString;
 
 @Data
-@ToString
+@AllArgsConstructor
 public class MessageDTO {
-    private String name;
+    private String messageType;
+    private String reference;
     private String content;
-
 }

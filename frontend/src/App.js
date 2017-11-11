@@ -1,9 +1,6 @@
 import React from 'react';
+import SockJS from 'sockjs-client'
 import './App.css';
-
-function Welcome(props) {
-    return <h1>Hello, {props.name}</h1>;
-}
 
 class Clock extends React.Component {
 
@@ -74,7 +71,8 @@ function MessageWindow(props) {
     return (
         <div className={"MessageWindow"}>
             {props.messages.map(function (msg) {
-                return <p key={ID()}>{msg.user}: {msg.text}</p>;
+                console.log(msg);
+                return <p key={ID()}>{msg.reference}: {msg.content}</p>;
             })}
         </div>
     );
@@ -125,12 +123,8 @@ class MessageLine extends React.Component {
 
     onSubmit(event) {
         event.preventDefault();
-        let message = {
-            id: ID(),
-            user: this.props.userName,
-            text: this.state.text
-        };
-        this.props.appendNewMessage(message)
+        this.props.appendNewMessage(ID(), this.props.userName, this.state.text);
+        this.props.sock.send(createMessage("sendText", this.state.userName, this.state.text));
         this.setState({text: ""})
     }
 
@@ -142,7 +136,8 @@ class MessageLine extends React.Component {
         const isDisabled = !this.props.connectState;
         return (
             <form onSubmit={this.onSubmit}>
-                <textarea className="TextLine" value={this.state.text} onChange={this.handleTextChange} disabled={isDisabled}/>
+                <textarea className="TextLine" value={this.state.text} onChange={this.handleTextChange}
+                          disabled={isDisabled}/>
                 <input className="Button" type="submit" value="Send" disabled={isDisabled}/>
             </form>
         );
@@ -157,32 +152,20 @@ class App extends React.Component {
     constructor(props) {
         super(props);
         window.app = this;
+        this.sock = null;
+
         this.state = {
             isConnected: false,
             userName: "My Name",
-            users: ["Mo", "Moo", "Mooo"],
-            messages: [
-                {
-                    id: 1,
-                    user: "testUser",
-                    text: "testText124551 12545"
-                },
-                {
-                    id: 2,
-                    user: "Mo",
-                    text: "I am the one and only!"
-                }, {
-                    id: 3,
-                    user: "Moo",
-                    text: "Nah! You write all the bugs!"
-                }
-            ]
+            users: [],
+            messages: []
         };
 
         this.changeConnectState = this.changeConnectState.bind(this);
         this.changeUserName = this.changeUserName.bind(this);
         this.appendNewMessage = this.appendNewMessage.bind(this);
     }
+
 
     changeUserName(userName) {
         this.setState(prevState => ({
@@ -191,20 +174,76 @@ class App extends React.Component {
     }
 
     changeConnectState() {
+
+
         if (this.state.isConnected) {
             console.log("Disconnecting ...");
+            this.setState(prevState => ({
+                isConnected: false,
+                users: []
+            }));
+            this.sock.close();
         } else {
-            console.log("Connecting ...");
+            this.setState(prevState => ({
+                isConnected: true
+            }));
+
+            this.sock = new SockJS('http://' + window.location.hostname + ':8080/gs-guide-websocket')
+
+
+            this.sock.onopen = function () {
+                console.log('open');
+                console.log(this.state);
+                this.sock.send(createMessage("connect", this.state.userName, null));
+            };
+            this.sock.onmessage = function (e) {
+                console.log(e);
+                let json = JSON.parse(e.data);
+                console.log('message', json);
+
+                if (json.messageType === "connect") {
+                    this.appendNewMessage(ID(), "SYS", json.reference + " has connected.");
+                    this.setState(prevState => ({
+                        users: prevState.users.concat(json.reference)
+                    }));
+                } else if (json.messageType ==="disconnect") {
+                    this.appendNewMessage(ID(), "SYS", json.reference + " has left.");
+                    var users = this.state.users.filter(function(user) { return user !== json.reference });
+                    this.setState(prevState => ({
+                        users: users
+                    }));
+                } else if (json.messageType === "text") {
+                    this.appendNewMessage(ID(), json.reference, json.content);
+                } else if (json.messageType === "userList") {
+                    console.log(json);
+                    this.setState(prevState => ({
+                        users: prevState.users.concat(JSON.parse(json.content))
+                    }));
+                }
+
+            };
+            this.sock.onclose = function () {
+                console.log('close');
+            };
+
+            this.sock.onopen = this.sock.onopen.bind(this);
+            this.sock.onmessage = this.sock.onmessage.bind(this);
+
+
+            //this.sock.onopen = this.sock.onmessage.bind(this);
+
+
         }
-        this.setState(prevState => ({
-            isConnected: !prevState.isConnected
-        }));
     }
 
-    appendNewMessage(message) {
-
+    appendNewMessage(id, userName, message) {
+        let msg = {};
+        msg.id = id;
+        msg.reference = userName;
+        msg.content = message;
+        console.log("appending new message");
         this.setState(prevState => ({
-            messages: prevState.messages.concat(message)
+            messages: prevState.messages.concat(msg)
         }));
     }
 
@@ -229,7 +268,7 @@ class App extends React.Component {
                     <UserList users={users}/>
                 </div>
                 <div className="Footer">
-                    <MessageLine appendNewMessage={this.appendNewMessage} userName={userName}
+                    <MessageLine appendNewMessage={this.appendNewMessage} sock={this.sock} userName={userName}
                                  connectState={connectState}/>
                 </div>
             </div>
@@ -242,6 +281,14 @@ var ID = function () {
     // Convert it to base 36 (numbers + letters), and grab the first 9 characters
     // after the decimal.
     return '_' + Math.random().toString(36).substr(2, 9);
+};
+
+var createMessage = function (messageType, reference, content) {
+    let msg = {};
+    msg.messageType = messageType;
+    msg.reference = reference;
+    msg.content = content;
+    return JSON.stringify(msg);
 };
 
 export default App;
